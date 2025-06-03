@@ -26,6 +26,15 @@ For example,
 data/
 └── CROHME23.zip
 ```
+
+#### Some Information about the Data
+The CROHME 2023 dataset includes:
+- Real handwritten expressions from previous CROHME competitions
+- 150k+ artificially generated expressions
+- Both online (stroke) and offline (image) data
+- Train/validation/test splits
+Note: Some artificial data files may fail to parse due to encoding issues. This is normal and doesn't affect the core dataset quality.
+
 ### Phase 1: Converting .inkml Files into .png Files
 Please run this command to convert the data file types.
 ```bash
