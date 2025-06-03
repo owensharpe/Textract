@@ -33,6 +33,7 @@ The CROHME 2023 dataset includes:
 - 150k+ artificially generated expressions
 - Both online (stroke) and offline (image) data
 - Train/validation/test splits
+
 Note: Some artificial data files may fail to parse due to encoding issues. This is normal and doesn't affect the core dataset quality.
 
 ### Phase 1: Converting .inkml Files into .png Files
