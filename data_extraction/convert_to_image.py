@@ -11,7 +11,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
 import zipfile
-from pathlib import Path
 from tqdm import tqdm
 import shutil
 
@@ -61,10 +60,26 @@ def parse_inkml(inkml_path):
 
         # get LaTeX annotation
         latex = None
-        for annotation in root.findall('.//ink:trace', namespace):
-            if annotation.get('type') == 'truth':
-                latex = annotation.text
-                break
+
+        # we have to provide a list of singular symbols to skip in order to make sure the latex annotation is preserved
+        single_symbols = ['Closest Strk', 'x', '=', '(', ')', 'a', 'b', 'c', 'd',
+                         '+', '-', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
+                         '\\prime', '\\alpha', '\\beta', '\\gamma', '\\delta',
+                         '\\epsilon', '\\theta', '\\lambda', '\\mu', '\\pi', '\\sigma',
+                         '\\phi', '\\psi', '\\omega', '\\sum', '\\int', '\\infty',
+                         '\\sqrt', '\\frac', '\\cdot', '\\times', '\\div', '\\leq',
+                         '\\geq', '\\neq', '\\approx', '\\in', '\\subset', '\\cup',
+                         '\\cap', '\\forall', '\\exists', '\\partial', '\\nabla']
+
+        for annotation in root.findall('.//ink:annotation', namespace):
+            if annotation.text and annotation.get('type') == 'truth':
+                txt = annotation.text.strip()
+                if txt and txt not in single_symbols and len(txt) > 2:
+                    if txt.startswith('$') and txt.endswith('$'):
+                        latex = txt[1:-1]
+                    else:
+                        latex = txt
+                    break
         return strokes, latex
 
     except ET.ParseError as e:
@@ -194,8 +209,6 @@ def inkml_to_png(inkml_path, png_path, img_size=(224, 224)):
     # create output path for png image
     os.makedirs(os.path.dirname(png_path), exist_ok=True)
 
-    os.makedirs(os.path.dirname(png_path), exist_ok=True)
-
     # save image
     image.save(png_path, 'PNG')
 
@@ -224,7 +237,7 @@ def convert_dataset(input_dir, output_dir, img_size=(224, 224)):
     :param input_dir: the specified input directory for the files
     :param output_dir: the specified output directory for the files
     :param img_size: the image size we want
-    :return:
+    :return: Null (performing task of converting dataset files)
     """
 
     print(f"Searching for InkML files in {input_dir}...")
@@ -241,6 +254,8 @@ def convert_dataset(input_dir, output_dir, img_size=(224, 224)):
     # keep track of file conversion successes
     successes = 0
     failures = 0
+    artificial_failures = 0
+    absent_latex_count = 0
     labels = []
 
     # look through all .inkml file paths
@@ -258,19 +273,28 @@ def convert_dataset(input_dir, output_dir, img_size=(224, 224)):
             successes += 1
             if latex:
                 labels.append(f"{os.path.basename(output_path)}\t{latex}")
+            else:
+                absent_latex_count += 1
         else:
             failures += 1
+            if 'Artificial_data' in inkml_path:
+                artificial_failures += 1
 
     # save the labels file
     if labels:
         labels_path = os.path.join(output_dir, 'labels.txt')
         with open(labels_path, 'w', encoding='utf-8') as f:
             f.write('\n'.join(labels))
-        print(f"\nSaved LaTeX labels to {labels_path}")
+        print(f"\nSaved {len(labels)} LaTeX labels to {labels_path}")
+    else:
+        print("\nNo LaTeX annotations found in any files!")
 
     print(f"\nConversion complete!")
     print(f"  Successful: {successes}")
-    print(f"  Failed: {failures}")
+    print(f"  Failed: {failures} (including {artificial_failures} artificial data files)")
+    print(f"  Files without LaTeX: {absent_latex_count}")
+    print(f"  Files with LaTeX: {len(labels)}")
+    print(f"  Success rate: {successes/(successes+failures)*100:.1f}%")
     print(f"  Output directory: {output_dir}")
 
 
@@ -281,6 +305,7 @@ def main():
     temp_dir = '../data/extracted_crohme_zip_file'
     output_dir = '../data/crohme_images'
     img_size = (224, 224)
+    keep_temp_files = True  # we only set to True in the case of debugging
 
     # check if the zip file exists:
     if not os.path.exists(zip_path):
