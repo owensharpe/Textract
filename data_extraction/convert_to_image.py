@@ -8,7 +8,6 @@ Description: Converting .inkml files from the CROHME dataset into readable image
 import os
 import xml.etree.ElementTree as ET
 import numpy as np
-import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw
 import zipfile
 from tqdm import tqdm
