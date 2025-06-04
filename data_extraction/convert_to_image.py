@@ -276,7 +276,7 @@ def main():
     temp_dir = os.path.join(base_dir, 'data', 'extracted_crohme_zip_file')
     output_dir = os.path.join(base_dir, 'data', 'crohme_images')
     img_size = (224, 224)
-    keep_temp_files = True  # we only set to True in the case of debugging
+    # keep_temp_files = True  # we only set to True in the case of debugging
 
     # check if the zip file exists:
     if not os.path.exists(zip_path):
