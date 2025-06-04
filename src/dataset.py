@@ -11,8 +11,6 @@ from torchvision import transforms
 from PIL import Image
 import os
 from collections import Counter
-import numpy as np
-from typing import Dict, List, Tuple, Optional
 import json
 
 
@@ -307,6 +305,7 @@ def collate(batch):
         'latex_texts': [item['latex_text'] for item in batch],
         'image_paths': [item['image_path'] for item in batch]
     }
+
 
 # creating data loaders for dataset
 def create_dataloaders(root_dir, batch_size=32, num_workers=4, transform=None):
