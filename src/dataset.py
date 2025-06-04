@@ -86,7 +86,7 @@ class LaTeXVocab:
         }
 
         # apply these simpler symbols
-        for old_syntax, new_syntax in replacements:
+        for old_syntax, new_syntax in replacements.items():
             expression = expression.replace(old_syntax, new_syntax)
 
         # split tokens into list
@@ -114,7 +114,7 @@ class LaTeXVocab:
             if token in self.token_to_idx:  # if it's a known token
                 indices.append(self.token_to_idx[token])
             else:
-                indices.append(self.token_to_idx['UNK'])  # pass the unknown token if we don't know it
+                indices.append(self.token_to_idx['<UNK>'])  # pass the unknown token if we don't know it
         return indices
 
     # decode the token indices into a latex expression
@@ -220,7 +220,9 @@ class CROHMEDataset(Dataset):
         """
 
         # try to load the path for the labels
-        label_path = os.path.join(self.root_dir, 'labels.txt')
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        base_dir = os.path.dirname(script_dir)
+        label_path = os.path.join(base_dir, 'data', 'crohme_images', 'labels.txt')
         if not os.path.exists(label_path):
             raise FileNotFoundError(f"Labels file not found at {label_path}")
 
@@ -233,15 +235,20 @@ class CROHMEDataset(Dataset):
                     filename, latex = sections
                     samples.append((filename, latex))
 
-        # filter data by dataset partition
-        split_dir = os.path.join(self.root_dir, self.split)
+        # Build a lookup of all available files in the split directory
+        split_dir = os.path.join(base_dir, 'data', 'crohme_images', 'TC11_CROHME23', 'INKML', self.split)
+        available_files = {}
+        for root, _, files in os.walk(split_dir):
+            for file in files:
+                available_files[file] = os.path.join(root, file)
+
+        # Now we can do fast dictionary lookups instead of walking the directory each time
         for filename, latex in samples:
-            for root, dirs, files in os.walk(split_dir):  # check if file belongs in data partition
-                if filename in files:
-                    img_path = os.path.join(root, filename)
-                    if os.path.exists(img_path):
-                        self.samples.append((img_path, latex))
-                    break
+            if filename in available_files:
+                img_path = available_files[filename]
+                if os.path.exists(img_path):  # Double check file still exists
+                    self.samples.append((img_path, latex))
+
         print(f"Loaded {len(self.samples)} samples for {self.split} split")
 
     # standard dataset length function
@@ -274,7 +281,7 @@ class CROHMEDataset(Dataset):
             'image': img,
             'latex': latex_tensor,
             'latex_text': latex,
-            'image path': img_path
+            'image_path': img_path
         }
 
 
