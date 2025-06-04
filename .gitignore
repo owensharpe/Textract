@@ -1,0 +1,5 @@
+# don't track anything in data folder (so we don't kill github)
+data/* 
+
+# but keep the .gitkeep file
+!data/.gitkeep
