@@ -9,7 +9,7 @@ import os
 import xml.etree.ElementTree as ET
 import numpy as np
 import matplotlib.pyplot as plt
-from PIL import Image
+from PIL import Image, ImageDraw
 import zipfile
 from tqdm import tqdm
 import shutil
@@ -138,51 +138,21 @@ def normalize_strokes(curr_strokes, desired_target_size=(224, 224), padding=16):
 # converting the strokes into PIL images
 def stroke_to_image(curr_strokes, img_size=(224, 224), line_width=2):
     """
-    :param curr_strokes: the strokes of the file we're looking at
-    :param img_size: image size we want
-    :param line_width: self-explanatory
-    :return: image formatted file
+    Render strokes directly to a PIL image using ImageDraw (no matplotlib).
+    :param curr_strokes: list of (N, 2) numpy arrays (already normalized to image space)
+    :param img_size: output image size
+    :param line_width: thickness of lines
+    :return: PIL.Image
     """
+    img = Image.new('RGB', img_size, color='white')
+    draw = ImageDraw.Draw(img)
 
-    # create a matplotlib figure
-    dpi = 100
-    fig_size = (img_size[0] / dpi, img_size[1] / dpi)
-    fig, ax = plt.subplots(figsize=fig_size, dpi=dpi)
-
-    # set up plot axes
-    ax.set_xlim(0, img_size[0])
-    ax.set_ylim(0, img_size[1])
-    ax.invert_yaxis()
-    ax.axis('off')
-
-    # set a white background
-    fig.patch.set_facecolor('white')
-    ax.set_facecolor('white')
-
-    # draw strokes on said white background
     for stroke in curr_strokes:
         if len(stroke) > 1:
-            ax.plot(stroke[:, 0], stroke[:, 1],
-                    'k-', linewidth=line_width,
-                    solid_capstyle='round',
-                    solid_joinstyle='round')
+            points = [tuple(p) for p in stroke]
+            draw.line(points, fill='black', width=line_width, joint='curve')
 
-    # now convert to image (try buffer_rgba newer matplotlib versions)
-    fig.canvas.draw()
-    try:
-        img_array = np.frombuffer(fig.canvas.buffer_rgba(), dtype='uint8')
-        img_array = img_array.reshape(fig.canvas.get_width_height()[::-1] + (4,))
-
-        # convert RGBA to RGB
-        img_array = img_array[:, :, :3]
-    except AttributeError:
-
-        # fallback for older matplotlib
-        img_array = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-        img_array = img_array.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-    plt.close(fig)
-
-    return Image.fromarray(img_array)
+    return img
 
 
 # convert an .inkml file to .png
@@ -301,9 +271,11 @@ def convert_dataset(input_dir, output_dir, img_size=(224, 224)):
 def main():
 
     # initialize
-    zip_path = '../data/CROHME23.zip'
-    temp_dir = '../data/extracted_crohme_zip_file'
-    output_dir = '../data/crohme_images'
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    base_dir = os.path.dirname(script_dir)
+    zip_path = os.path.join(base_dir, 'data', 'CROHME23.zip')
+    temp_dir = os.path.join(base_dir, 'data', 'extracted_crohme_zip_file')
+    output_dir = os.path.join(base_dir, 'data', 'crohme_images')
     img_size = (224, 224)
     keep_temp_files = True  # we only set to True in the case of debugging
 
