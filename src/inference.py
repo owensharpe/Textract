@@ -28,7 +28,7 @@ def predict_latex(model, image_path, vocab, transform, device, max_length=50):
     return ' '.join(predicted_tokens)
 
 def main():
-    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     
     script_dir = os.path.dirname(os.path.abspath(__file__))

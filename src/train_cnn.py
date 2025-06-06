@@ -85,7 +85,7 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, num_epoch
         torch.save(model.state_dict(), 'model.pth')
 
 def main():
-    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     
     # Create data loaders
