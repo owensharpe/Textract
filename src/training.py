@@ -16,6 +16,7 @@ from tqdm import tqdm
 import os
 import json
 import argparse
+from torchvision import transforms
 
 # import modules
 from dataset import create_dataloaders
@@ -300,14 +301,23 @@ def train(args):
     """
 
     # set training device
-    device = torch.device('cuda' if torch.cuda_is_available() else 'cpu')
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    # create dataloaders
+    # Define transform
+    transform = transforms.Compose([
+        transforms.Grayscale(num_output_channels=3),  # Convert to 3 channels
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.9, 0.9, 0.9], std=[0.1, 0.1, 0.1])  # Adjusted for 3 channels
+    ])
+
+    # create dataloaders with the transform
     train_loader, val_loader, test_loader, vocab = create_dataloaders(
         root_dir=args.data_dir,
         batch_size=args.batch_size,
-        num_workers=args.num_workers
+        num_workers=args.num_workers,
+        transform=transform
     )
 
     # save latex vocabulary
@@ -334,7 +344,7 @@ def train(args):
 
     # create optimizer and scheduler (we're going to use adam)
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3) #verbose=True isn't a valid arg
 
     # also using a TensorBoard writer
     tb_writer = SummaryWriter(os.path.join(args.output_dir, 'logs'))
@@ -433,7 +443,7 @@ def main():
     # model arguments
     parser.add_argument('--encoder-d', type=int, default=256,
                         help='Encoder hidden dimension')
-    parser.add_argument('--decoder-d', type=int, default=512,
+    parser.add_argument('--decoder-d', type=int, default=256,
                         help='Decoder hidden dimension')
     parser.add_argument('--embed-d', type=int, default=256,
                         help='Embedding dimension')
