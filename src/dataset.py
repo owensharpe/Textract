@@ -95,7 +95,7 @@ class LaTeXVocab:
         return tokens
 
     # encode the latex expressions to token indices
-    def encode(self, expression, max_length):
+    def encode(self, expression, max_length=None):
         """
         :param expression: the provided latex expression
         :param max_length: the maximum length we might specify (if provided)
@@ -118,7 +118,7 @@ class LaTeXVocab:
         return indices
 
     # decode the token indices into a latex expression
-    def decode(self, indices, skip_special):
+    def decode(self, indices, skip_special=True):
         """
         :param indices: the encoded indices
         :param skip_special: if we want to skip special tokens
@@ -192,7 +192,7 @@ class CROHMEDataset(Dataset):
 
         # provide default transform if not provided
         if transform is None:
-            self.transform = transform.Compose([
+            self.transform = transforms.Compose([
                 transforms.Grayscale(num_output_channels=1),
                 transforms.Resize((224, 224)),
                 transforms.ToTensor(),
@@ -227,27 +227,31 @@ class CROHMEDataset(Dataset):
             raise FileNotFoundError(f"Labels file not found at {label_path}")
 
         # read labels
-        samples = []
+        all_samples = []
         with open(label_path, 'r', encoding='utf-8') as file:
             for line in file:
                 sections = line.strip().split('\t')
                 if len(sections) == 2:
                     filename, latex = sections
-                    samples.append((filename, latex))
+                    all_samples.append((filename, latex))
 
-        # Build a lookup of all available files in the split directory
+        # build lookup of all available files in split directory
         split_dir = os.path.join(base_dir, 'data', 'crohme_images', 'TC11_CROHME23', 'INKML', self.split)
         available_files = {}
+
+        print(f"Building file index for {self.split} split...")
         for root, _, files in os.walk(split_dir):
             for file in files:
-                available_files[file] = os.path.join(root, file)
+                if file.endswith('.png'):  # only index PNG files
+                    available_files[file] = os.path.join(root, file)
 
-        # Now we can do fast dictionary lookups instead of walking the directory each time
-        for filename, latex in samples:
+        print(f"Found {len(available_files)} image files in {self.split} directory")
+
+        # match labels with available files
+        self.samples = []
+        for filename, latex in all_samples:
             if filename in available_files:
-                img_path = available_files[filename]
-                if os.path.exists(img_path):  # Double check file still exists
-                    self.samples.append((img_path, latex))
+                self.samples.append((available_files[filename], latex))
 
         print(f"Loaded {len(self.samples)} samples for {self.split} split")
 
