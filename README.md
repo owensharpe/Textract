@@ -41,3 +41,5 @@ Please run this command to convert the data file types.
 ```bash
 python data_extraction/convert_to_image.py
 ```
+
+### Phase 2: Building CROHME Dataset for Model
