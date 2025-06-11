@@ -1,0 +1,11 @@
+# don't track anything in data folder (so we don't kill github)
+data/* 
+experiments/*
+
+# but keep the .gitkeep file
+!data/.gitkeep
+
+# keep all args.json files in any experiment folder
+!experiments/*/args.json
+experiments/**/*.pth" 
+*.pth
