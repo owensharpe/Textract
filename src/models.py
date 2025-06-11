@@ -10,6 +10,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as f
 import torchvision.models as models
+from torch.nn import TransformerDecoder, TransformerDecoderLayer
+import math
 
 
 # 2D grid positional encoding for features (output of CNN)
@@ -42,6 +44,23 @@ class PositionEncoding(nn.Module):
 
         h, w = x.shape[2:]  # get height and width from tensor
         return x + self.pos_e[:h, :w, :].permute(2, 0, 1).unsqueeze(0)  # add positional encodings to tensor
+
+# --------------------------------------------------------
+# Added TokenPositionalEncoding for transformer decoder
+class TokenPositionalEncoding(nn.Module):
+    def __init__(self, d_model, max_len=512):
+        super().__init__()
+        pos = torch.arange(0, max_len).unsqueeze(1)
+        i = torch.arange(0, d_model).unsqueeze(0)
+        angle = pos / (10000 ** (2 * (i // 2) / d_model))
+        pe = torch.zeros(max_len, d_model)
+        pe[:, 0::2] = torch.sin(angle[:, 0::2])
+        pe[:, 1::2] = torch.cos(angle[:, 1::2])
+        self.register_buffer('pe', pe.unsqueeze(0))
+
+    def forward(self, x):
+        x = x + self.pe[:, :x.size(1), :]
+        return x
 
 
 # CNN encoder for image input to extract features
@@ -98,8 +117,77 @@ class ImageEncoder(nn.Module):
         features = self.refine(features)
 
         return features
+    
+class TransformerLatexDecoder(nn.Module):
+    def __init__(self, vocab_size, d_model=256, num_heads=8, num_layers=3,
+                dim_feedforward=512, dropout=0.1, max_seq_len=512):
+        super().__init__()
+        self.d_model = d_model
+        self.embedding = nn.Embedding(vocab_size, d_model)
+        self.pos_encoder = TokenPositionalEncoding(d_model, max_len=max_seq_len)
+        decoder_layer = TransformerDecoderLayer(
+            d_model=d_model, nhead=num_heads,
+            dim_feedforward=dim_feedforward, dropout=dropout,
+            batch_first=True
+        )
+        self.transformer_decoder = TransformerDecoder(decoder_layer, num_layers=num_layers)
+        self.out_proj = nn.Linear(d_model, vocab_size)
+
+    def forward(self, encoder_out, captions):
+        # encoder_out: (B, hidden_d, H, W)
+        B, D, H, W = encoder_out.size()
+        enc_flat = encoder_out.view(B, D, -1).permute(0,2,1)  # (B, N_pixels, D)
+        # embed target captions
+        tgt = self.embedding(captions) * math.sqrt(self.d_model)
+        tgt = self.pos_encoder(tgt)
+        # causal mask
+        seq_len = captions.size(1)
+        mask = nn.Transformer.generate_square_subsequent_mask(seq_len).to(tgt.device)
+        # decode
+        out = self.transformer_decoder(tgt, enc_flat, tgt_mask=mask)
+        logits = self.out_proj(out)
+        return logits, None  # no attn weights
+
+# --------------------------------------------------------
+# Full model wrapper that uses the transformer decoder
+class ImageToLatex(nn.Module):
+    def __init__(self, vocab_size, encoder_hidden_d=256,
+                embed_d=256, num_heads=8, num_layers=3,
+                dim_feedforward=None, dropout=0.1,
+                pretrained_encoder=True):
+        super().__init__()
+        if dim_feedforward is None:
+            dim_feedforward = 4 * encoder_hidden_d
+        self.encoder = ImageEncoder(pretrained=pretrained_encoder, hidden_d=encoder_hidden_d)
+        self.decoder = TransformerLatexDecoder(
+            vocab_size=vocab_size,
+            d_model=encoder_hidden_d,
+            num_heads=num_heads,
+            num_layers=num_layers,
+            dim_feedforward=dim_feedforward,
+            dropout=dropout
+        )
+
+    def forward(self, images, captions=None):
+        enc_out = self.encoder(images)
+        if captions is not None:
+            outputs, _ = self.decoder(enc_out, captions)
+            return outputs, None
+        else:
+            # greedy generation (simple) -- not beam.
+            seq = [torch.full((images.size(0),), 1, dtype=torch.long, device=images.device)]
+            for _ in range(150):
+                tgt = torch.stack(seq, dim=1)
+                out, _ = self.decoder(enc_out, tgt)
+                next_tok = out.argmax(dim=-1)[:, -1]
+                seq.append(next_tok)
+                if (next_tok == 2).all():
+                    break
+            pred = torch.stack(seq[1:], dim=1)
+            return pred
 
 
+"""
 # using Attention to focus on specific regions of importance in the image
 class Attention(nn.Module):
 
@@ -115,11 +203,11 @@ class Attention(nn.Module):
 
     # running forward pass
     def forward(self, encoder_out, hidden_decoder):
-        """
-        :param encoder_out: the encoded output from the previous layers
-        :param hidden_decoder: the decoded hidden layer
-        :return: the attention weights and the surrounding context
-        """
+        
+        #:param encoder_out: the encoded output from the previous layers
+        #:param hidden_decoder: the decoded hidden layer
+        #:return: the attention weights and the surrounding context
+        
 
         # transform encoded output
         att_1 = self.attention_encoder(encoder_out)
@@ -177,10 +265,10 @@ class LatexDecoder(nn.Module):
 
     # performing initialization of decoder hidden state from the encoder output
     def init_hidden_state(self, encoder_out):
-        """
-        :param encoder_out: encoded output from previous layers
-        :return:
-        """
+        
+        #:param encoder_out: encoded output from previous layers
+        #:return:
+        
 
         # pool over dimensions
         mean_encoded_out = encoder_out.mean(dim=[2,3])
@@ -197,11 +285,11 @@ class LatexDecoder(nn.Module):
 
     # perform forward pass
     def forward(self, encoder_out, captions):
-        """
-        :param encoder_out: the encoded output from previous layers
-        :param captions: targeted sequences
-        :return: outputs with the attention weights
-        """
+        
+        #:param encoder_out: the encoded output from previous layers
+        #:param captions: targeted sequences
+        #:return: outputs with the attention weights
+        
 
         batch_size = encoder_out.size(0)
         encoder_d = encoder_out.size(1)
@@ -247,13 +335,13 @@ class LatexDecoder(nn.Module):
 
     # generate the LaTeX sequence using beam search
     def generate(self, encoder_out, max_len=150, start_tok=1, end_tok=2):
-        """
-        :param encoder_out: encoded output from previous layers
-        :param max_len: maximum length for sequences
-        :param start_tok: starting token
-        :param end_tok: ending token
-        :return: predicted sequence
-        """
+        
+        #:param encoder_out: encoded output from previous layers
+        #:param max_len: maximum length for sequences
+        #:param start_tok: starting token
+        #:param end_tok: ending token
+        #:return: predicted sequence
+        
 
         batch_size = encoder_out.size(0)
         device = encoder_out.device
@@ -324,11 +412,10 @@ class ImageToLatex(nn.Module):
 
     # forward pass
     def forward(self, images, captions=None):
-        """
-        :param images: self-explanatory
-        :param captions: target sequences
-        :return: outputs and attention weights (if training); predictions (if testing)
-        """
+        #:param images: self-explanatory
+        #:param captions: target sequences
+        #:return: outputs and attention weights (if training); predictions (if testing)
+        
 
         # encode the images
         encoded_out = self.encoder(images)
@@ -339,3 +426,4 @@ class ImageToLatex(nn.Module):
         else:
             pred = self.decoder.generate(encoded_out)
             return pred
+"""
