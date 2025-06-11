@@ -3,11 +3,4 @@ data/*
 !data/.gitkeep
 
 # experiments - allow directories but block specific files
-experiments/
-!experiments/*/
-!experiments/*/args.json
-!experiments/*/vocab.json
-experiments/**/*.pth
-experiments/**/logs/
-experiments/**/model_checkpoint*
 *.pth
