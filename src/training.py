@@ -324,6 +324,7 @@ def train(args):
     vocab.save(os.path.join(args.output_dir, 'vocab.json'))
 
     # create model
+    """
     print("Creating model...")
     model = ImageToLatex(
         vocab_size=len(vocab.token_to_idx),
@@ -332,6 +333,17 @@ def train(args):
         embed_d=args.embed_d,
         attention_d=args.attention_d,
         num_layers=args.num_layers,
+        dropout=args.dropout,
+        pretrained_encoder=args.pretrained
+    ).to(device)
+    """
+    model = ImageToLatex(
+        vocab_size=len(vocab.token_to_idx),
+        encoder_hidden_d=args.encoder_d,
+        # decoder_hidden_d & attention_d are no longer used
+        num_heads=args.num_heads,
+        num_layers=args.num_layers,
+        dim_feedforward=args.dim_feedforward,
         dropout=args.dropout,
         pretrained_encoder=args.pretrained
     ).to(device)
@@ -400,6 +412,7 @@ def train(args):
 
         # save an updated checkpoint
         checkpoint = {
+            'args': vars(args),
             'epoch': epoch + 1,
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
@@ -455,6 +468,10 @@ def main():
                         help='Dropout rate')
     parser.add_argument('--pretrained', action='store_true',
                         help='Use pretrained encoder')
+
+    # for new transformer
+    parser.add_argument('--num-heads',      type=int, default=8,   help='Transformer self-attention heads')
+    parser.add_argument('--dim-feedforward', type=int, default=1024, help='Transformer feedforward dimension')
 
     # training arguments
     parser.add_argument('--epochs', type=int, default=100,

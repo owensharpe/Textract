@@ -27,7 +27,7 @@
 #     predicted_tokens = [vocab.idx_to_token[idx] for idx in pred_caption[1:]]  # skip <SOS>
 #     return ' '.join(predicted_tokens)
 
-# def main():
+# def ():
 #     device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
 #     print(f"Using device: {device}")
     
@@ -113,6 +113,7 @@ def load_model(checkpoint_path, device='cpu'):
     vocab.token_to_idx = checkpoint['vocab']
     vocab.idx_to_token = {int(idx): tok for tok, idx in vocab.token_to_idx.items()}
 
+    """
     # now create model
     model = ImageToLatex(
         vocab_size=len(vocab.token_to_idx),
@@ -122,6 +123,17 @@ def load_model(checkpoint_path, device='cpu'):
         attention_d=256,
         num_layers=2,
         dropout=0.0
+    ).to(device)
+    """
+
+    model = ImageToLatex(
+        vocab_size=len(vocab.token_to_idx),
+        encoder_hidden_d=checkpoint['args']['encoder_d'],
+        num_heads=checkpoint['args']['num_heads'],
+        num_layers=checkpoint['args']['num_layers'],
+        dim_feedforward=checkpoint['args']['dim_feedforward'],
+        dropout=checkpoint['args']['dropout'],
+        pretrained_encoder=checkpoint['args']['pretrained']
     ).to(device)
 
     # load weights
