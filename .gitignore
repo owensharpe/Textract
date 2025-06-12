@@ -3,4 +3,5 @@ data/*
 !data/.gitkeep
 
 # experiments - allow directories but block specific files
-*.pth
+*.pth__pycache__/
+*.pyc
