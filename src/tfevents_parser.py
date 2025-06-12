@@ -157,9 +157,9 @@ def main():
     # Set default output path to be in the input directory
     if args.output is None:
         if input_path.is_file():
-            args.output = input_path.parent / "extracted_data"
+            args.output = input_path.parent / "data"
         else:
-            args.output = input_path / "extracted_data"
+            args.output = input_path / "data"
     else:
         args.output = Path(args.output)
     
