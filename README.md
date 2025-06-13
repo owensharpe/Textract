@@ -13,7 +13,7 @@ This project implements a three-stage approach for handwritten math recognition:
 ### Setup
 #### Prerequisites
 - Python 3.8+
-- Required packages:
+- To download required packages:
 ```bash
 pip install -r requirements.txt
 ```
